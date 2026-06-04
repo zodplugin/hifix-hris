@@ -98,9 +98,16 @@ class AttendanceController extends Controller
             return redirect()->back()->withErrors('Already clocked in today.');
         }
 
-        // Determine if late (assuming 09:00:00 is limit)
+        // Determine if late based on setting
+        $limitSetting = \App\Models\Setting::where('key', 'clock_in_limit')->first();
+        $limit = $limitSetting ? $limitSetting->value : '09:00';
+        
+        if (strlen($limit) === 5) {
+            $limit .= ':00';
+        }
+
         $now = Carbon::now();
-        $status = $now->format('H:i:s') > '09:00:00' ? 'late' : 'present';
+        $status = $now->format('H:i:s') > $limit ? 'late' : 'present';
 
         $request->validate([
             'photo' => 'required|string',
