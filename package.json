@@ -22,6 +22,7 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
+        "framer-motion": "^12.40.0",
         "leaflet": "^1.9.4",
         "prop-types": "^15.8.1",
         "react-hot-toast": "^2.6.0",
