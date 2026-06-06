@@ -15,8 +15,15 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        // Get employees with their department and user relationships
-        $employees = Employee::with(['department', 'user'])->latest()->get()->map(function ($employee) {
+        $user = auth()->user();
+        $query = Employee::with(['department', 'user']);
+
+        // Employees can only view their own record
+        if ($user->role === 'employee') {
+            $query->where('user_id', $user->id);
+        }
+
+        $employees = $query->latest()->get()->map(function ($employee) {
             return [
                 'id' => $employee->id,
                 'employee_code' => $employee->employee_code,
@@ -57,6 +64,7 @@ class EmployeeController extends Controller
                 'is_contract_extendable' => (bool) $employee->is_contract_extendable,
                 'contract_document_path' => $employee->contract_document_path ? asset('storage/' . $employee->contract_document_path) : null,
                 'nda_document_path' => $employee->nda_document_path ? asset('storage/' . $employee->nda_document_path) : null,
+                'user_id' => $employee->user_id,
             ];
         });
 
@@ -232,37 +240,42 @@ class EmployeeController extends Controller
 
     public function generateContract(Request $request, $id)
     {
-        $employee = Employee::with(['department', 'user'])->findOrFail($id);
+        try {
+            $employee = Employee::with(['department', 'user'])->findOrFail($id);
 
-        $request->validate([
-            'signature_base64' => 'required|string',
-        ]);
+            $request->validate([
+                'signature_base64' => 'required|string',
+            ]);
 
-        // Decode signature image
-        $signatureData = $request->signature_base64;
-        list($type, $signatureData) = explode(';', $signatureData);
-        list(, $signatureData)      = explode(',', $signatureData);
-        $signatureData = base64_decode($signatureData);
+            // Decode signature image
+            $signatureData = $request->signature_base64;
+            list($type, $signatureData) = explode(';', $signatureData);
+            list(, $signatureData)      = explode(',', $signatureData);
+            $signatureData = base64_decode($signatureData);
 
-        $signatureFileName = 'signatures/' . uniqid('sig_') . '.png';
-        Storage::disk('public')->put($signatureFileName, $signatureData);
+            $signatureFileName = 'signatures/' . uniqid('sig_') . '.png';
+            Storage::disk('public')->put($signatureFileName, $signatureData);
 
-        $employee->update([
-            'signature_path' => $signatureFileName,
-            'contract_signed_at' => now(),
-        ]);
+            $employee->update([
+                'signature_path' => $signatureFileName,
+                'contract_signed_at' => now(),
+            ]);
 
-        // Generate PDF
-        $pdf = Pdf::loadView('pdf.employee_contract', compact('employee'));
-        
-        $pdfFileName = 'contracts/PKWT_' . str_pad($employee->id, 3, '0', STR_PAD_LEFT) . '_' . date('Ymd') . '.pdf';
-        Storage::disk('public')->put($pdfFileName, $pdf->output());
+            // Generate PDF
+            $pdf = Pdf::loadView('pdf.employee_contract', compact('employee'));
+            
+            $pdfFileName = 'contracts/PKWT_' . str_pad($employee->id, 3, '0', STR_PAD_LEFT) . '_' . date('Ymd') . '.pdf';
+            Storage::disk('public')->put($pdfFileName, $pdf->output());
 
-        $employee->update([
-            'contract_document_path' => $pdfFileName,
-        ]);
+            $employee->update([
+                'contract_document_path' => $pdfFileName,
+            ]);
 
-        return redirect()->back()->with('success', 'Kontrak berhasil ditandatangani dan di-generate!');
+            return redirect()->back()->with('success', 'Kontrak berhasil ditandatangani dan di-generate!');
+        } catch (\Exception $e) {
+            \Log::error('Generate Contract Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return redirect()->back()->withErrors(['error' => 'Gagal generate PDF: ' . $e->getMessage()]);
+        }
     }
 
     public function previewContract($id)
@@ -277,38 +290,43 @@ class EmployeeController extends Controller
 
     public function generateNda(Request $request, $id)
     {
-        $employee = Employee::findOrFail($id);
-        
-        $request->validate([
-            'signature' => 'required|string', // base64 image
-        ]);
+        try {
+            $employee = Employee::findOrFail($id);
+            
+            $request->validate([
+                'signature' => 'required|string', // base64 image
+            ]);
 
-        // Save Signature Image
-        $signatureData = $request->input('signature');
-        // Remove data uri scheme
-        $signatureData = str_replace('data:image/png;base64,', '', $signatureData);
-        $signatureData = str_replace(' ', '+', $signatureData);
-        $signatureData = base64_decode($signatureData);
+            // Save Signature Image
+            $signatureData = $request->input('signature');
+            // Remove data uri scheme
+            $signatureData = str_replace('data:image/png;base64,', '', $signatureData);
+            $signatureData = str_replace(' ', '+', $signatureData);
+            $signatureData = base64_decode($signatureData);
 
-        $signatureFileName = 'signatures/' . uniqid('nda_sig_') . '.png';
-        Storage::disk('public')->put($signatureFileName, $signatureData);
+            $signatureFileName = 'signatures/' . uniqid('nda_sig_') . '.png';
+            Storage::disk('public')->put($signatureFileName, $signatureData);
 
-        $employee->update([
-            'nda_signature_path' => $signatureFileName,
-            'nda_signed_at' => now(),
-        ]);
+            $employee->update([
+                'nda_signature_path' => $signatureFileName,
+                'nda_signed_at' => now(),
+            ]);
 
-        // Generate PDF
-        $pdf = Pdf::loadView('pdf.employee_nda', compact('employee'));
-        
-        $pdfFileName = 'contracts/NDA_' . str_pad($employee->id, 3, '0', STR_PAD_LEFT) . '_' . date('Ymd') . '.pdf';
-        Storage::disk('public')->put($pdfFileName, $pdf->output());
+            // Generate PDF
+            $pdf = Pdf::loadView('pdf.employee_nda', compact('employee'));
+            
+            $pdfFileName = 'contracts/NDA_' . str_pad($employee->id, 3, '0', STR_PAD_LEFT) . '_' . date('Ymd') . '.pdf';
+            Storage::disk('public')->put($pdfFileName, $pdf->output());
 
-        $employee->update([
-            'nda_document_path' => $pdfFileName,
-        ]);
+            $employee->update([
+                'nda_document_path' => $pdfFileName,
+            ]);
 
-        return redirect()->back()->with('success', 'NDA berhasil ditandatangani dan di-generate!');
+            return redirect()->back()->with('success', 'NDA berhasil ditandatangani dan di-generate!');
+        } catch (\Exception $e) {
+            \Log::error('Generate NDA Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return redirect()->back()->withErrors(['error' => 'Gagal generate PDF: ' . $e->getMessage()]);
+        }
     }
 
     public function previewNda($id)
