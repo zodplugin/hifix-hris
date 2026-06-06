@@ -50,10 +50,12 @@ class RecruitmentController extends Controller
     {
         $candidates = Candidate::with('jobPosting.department')->get();
         $departments = Department::select('id', 'name')->get();
+        $jobPostings = JobPosting::with('department')->withCount('candidates')->orderBy('created_at', 'desc')->get();
 
         return Inertia::render('EmployeeLifecycle/Recruitment', [
             'candidatesData' => $candidates,
-            'departments' => $departments
+            'departments' => $departments,
+            'jobPostings' => $jobPostings
         ]);
     }
 
