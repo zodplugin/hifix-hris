@@ -243,7 +243,9 @@ class PayrollController extends Controller
             'total_deductions' => $payroll->deductions,
             'net_salary' => $payroll->net_salary,
             'payment_method' => 'Bank Transfer - BCA',
-            'status' => ucfirst($payroll->status)
+            'status' => ucfirst($payroll->status),
+            'employee_signature_url' => $payroll->employee_signature_path ? asset('storage/' . $payroll->employee_signature_path) : null,
+            'company_signature_url' => \App\Models\Setting::where('key', 'company_signature')->value('value') ? asset('storage/' . \App\Models\Setting::where('key', 'company_signature')->value('value')) : null,
         ];
 
         return Inertia::render('PayrollTax/Payslip', [
@@ -320,5 +322,28 @@ class PayrollController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    public function signPayslip(Request $request, $id)
+    {
+        $payroll = Payroll::findOrFail($id);
+        
+        $request->validate([
+            'signature_base64' => 'required|string',
+        ]);
+
+        $photoData = $request->input('signature_base64');
+        $photoData = str_replace('data:image/png;base64,', '', $photoData);
+        $photoData = str_replace(' ', '+', $photoData);
+        $photoData = base64_decode($photoData);
+
+        $path = 'signatures/payslip_sig_' . $payroll->id . '_' . time() . '.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $photoData);
+
+        $payroll->update([
+            'employee_signature_path' => $path
+        ]);
+
+        return redirect()->back()->with('success', 'Slip gaji berhasil ditandatangani!');
     }
 }
