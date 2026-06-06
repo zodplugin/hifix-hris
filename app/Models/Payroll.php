@@ -18,6 +18,7 @@ class Payroll extends Model
         'deductions',
         'net_salary',
         'status',
+        'employee_signature_path',
     ];
 
     public function employee()
