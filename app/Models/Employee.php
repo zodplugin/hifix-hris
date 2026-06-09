@@ -10,6 +10,22 @@ class Employee extends Model
 {
     use HasFactory;
 
+    protected static function booted()
+    {
+        static::created(function ($employee) {
+            $leaveTypes = \App\Models\LeaveType::all();
+            foreach ($leaveTypes as $type) {
+                \App\Models\LeaveBalance::firstOrCreate([
+                    'employee_id' => $employee->id,
+                    'leave_type_id' => $type->id,
+                ], [
+                    'quota' => $type->default_quota,
+                    'used' => 0,
+                ]);
+            }
+        });
+    }
+
     protected $fillable = [
         'user_id',
         'department_id',
@@ -40,6 +56,14 @@ class Employee extends Model
         'nda_signature_path',
         'nda_signed_at',
         'ptkp_status',
+        'annual_leave_quota',
+        'annual_leave_used',
+        'birthday_leave_quota',
+        'birthday_leave_used',
+        'marriage_leave_quota',
+        'marriage_leave_used',
+        'off_in_lieu_quota',
+        'off_in_lieu_used',
     ];
 
     protected $casts = [
@@ -50,6 +74,14 @@ class Employee extends Model
         'nda_signed_at' => 'datetime',
         'basic_salary' => 'decimal:2',
         'is_contract_extendable' => 'boolean',
+        'annual_leave_quota' => 'integer',
+        'annual_leave_used' => 'integer',
+        'birthday_leave_quota' => 'integer',
+        'birthday_leave_used' => 'integer',
+        'marriage_leave_quota' => 'integer',
+        'marriage_leave_used' => 'integer',
+        'off_in_lieu_quota' => 'integer',
+        'off_in_lieu_used' => 'integer',
     ];
 
     public function user()
@@ -95,6 +127,11 @@ class Employee extends Model
     public function timeOffRequests()
     {
         return $this->hasMany(TimeOffRequest::class);
+    }
+
+    public function leaveBalances()
+    {
+        return $this->hasMany(LeaveBalance::class);
     }
 
     public function courses()
