@@ -78,6 +78,18 @@ class DashboardController extends Controller
                     ];
                 });
 
+            $attendanceTrends = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $d = Carbon::today()->subDays($i)->format('Y-m-d');
+                $dateLabel = Carbon::today()->subDays($i)->format('d M');
+                $attendanceTrends[] = [
+                    'date' => $dateLabel,
+                    'present' => \App\Models\Attendance::where('date', $d)->where('status', 'present')->whereIn('employee_id', $teamEmployeesIds)->count(),
+                    'late' => \App\Models\Attendance::where('date', $d)->where('status', 'late')->whereIn('employee_id', $teamEmployeesIds)->count(),
+                    'absent' => \App\Models\Attendance::where('date', $d)->where('status', 'absent')->whereIn('employee_id', $teamEmployeesIds)->count(),
+                ];
+            }
+
             return Inertia::render('Dashboard', [
                 'isEmployee' => true,
                 'isManager' => true,
@@ -87,7 +99,8 @@ class DashboardController extends Controller
                 'myTodayShift' => $myTodayShift,
                 'teamPendingLeave' => $teamPendingLeave,
                 'teamPresentToday' => $teamPresentToday,
-                'latestTeamRequests' => $latestTeamRequests
+                'latestTeamRequests' => $latestTeamRequests,
+                'attendanceTrends' => $attendanceTrends
             ]);
         }
 
@@ -128,6 +141,18 @@ class DashboardController extends Controller
                 ];
             });
 
+        $attendanceTrends = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $d = Carbon::today()->subDays($i)->format('Y-m-d');
+            $dateLabel = Carbon::today()->subDays($i)->format('d M');
+            $attendanceTrends[] = [
+                'date' => $dateLabel,
+                'present' => \App\Models\Attendance::where('date', $d)->where('status', 'present')->count(),
+                'late' => \App\Models\Attendance::where('date', $d)->where('status', 'late')->count(),
+                'absent' => \App\Models\Attendance::where('date', $d)->where('status', 'absent')->count(),
+            ];
+        }
+
         return Inertia::render('Dashboard', [
             'isEmployee' => false,
             'totalEmployees' => $totalEmployees,
@@ -135,6 +160,7 @@ class DashboardController extends Controller
             'totalPresentToday' => $totalPresentToday,
             'totalPendingLeave' => $totalPendingLeave,
             'latestRequests' => $latestRequests,
+            'attendanceTrends' => $attendanceTrends,
         ]);
     }
 }
