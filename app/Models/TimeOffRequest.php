@@ -14,6 +14,7 @@ class TimeOffRequest extends Model
         'duration',
         'reason',
         'status',
+        'leave_type_id',
     ];
 
     protected $casts = [
@@ -24,5 +25,10 @@ class TimeOffRequest extends Model
     public function employee()
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function leaveType()
+    {
+        return $this->belongsTo(LeaveType::class);
     }
 }
